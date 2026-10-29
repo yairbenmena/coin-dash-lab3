@@ -5,6 +5,14 @@ press R to restart. This is deliberately small so you can add features during th
 
 **Play it here:** https://www.avivz.net/coin-dash/
 
+## Power-up coins
+
+Every 6–10 seconds a coloured power-up coin appears for 5 seconds (it blinks before vanishing).
+It is worth 3 points and gives a 6-second power-up: **E** drone-eater (drones turn blue and flee;
+touching one eats it for 5 points and it respawns 3 seconds later), **S** shield, **>** speed boost,
+or **\*** freeze (drones slow to a quarter speed). Power-ups stack; picking up the same one again
+refreshes it. The HUD shows active power-ups and their remaining seconds. Tuning lives in `settings.js`.
+
 ## Run it locally
 
 Clone the repository and open `index.html` in a browser. Everything is in the repository;
