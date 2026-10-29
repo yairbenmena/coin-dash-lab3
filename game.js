@@ -7,9 +7,12 @@ class CoinDash extends Phaser.Scene {
     this.score = 0;
     this.finished = false;
     this.deadline = this.time.now + c.roundSeconds * 1000;
-    this.physics.world.setBounds(0, 44, c.width, c.height - 44);
+    this.board = new Phaser.Geom.Rectangle(0, 44, c.width, c.height - 44);
+    this.physics.world.setBounds(this.board.x, this.board.y, this.board.width, this.board.height);
     this.add.grid(c.width / 2, c.height / 2, c.width, c.height, 40, 40,
       c.colors.background, 1, 0x24334b, 0.45);
+    this.shade = this.add.graphics();
+    this.drawBoard();
     this.hud = this.add.text(18, 12, '', { font: '18px monospace', color: '#ffffff' });
     this.player = this.add.rectangle(c.width / 2, c.height / 2, 24, 24, c.colors.player);
     this.physics.add.existing(this.player);
@@ -35,16 +38,51 @@ class CoinDash extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,R');
     this.input.keyboard.on('keydown-R', () => this.scene.restart());
+    this.shrinkTimer = this.time.addEvent({
+      delay: c.shrinkIntervalSeconds * 1000, loop: true, callback: this.shrinkBoard, callbackScope: this
+    });
+  }
+
+  shrinkBoard() {
+    const c = COIN_DASH, b = this.board;
+    const step = Math.floor(Math.min(c.shrinkAmount,
+      (b.width - c.minBoardWidth) / 2, (b.height - c.minBoardHeight) / 2));
+    if (this.finished || step <= 0) return this.shrinkTimer.remove();
+    b.setTo(b.x + step, b.y + step, b.width - step * 2, b.height - step * 2);
+    this.physics.world.setBounds(b.x, b.y, b.width, b.height);
+    this.drawBoard();
+    [this.player, this.coin, ...this.drones.getChildren()].forEach(obj => this.keepInside(obj));
+  }
+
+  keepInside(obj) {
+    const b = this.board, { halfWidth: hw, halfHeight: hh, velocity } = obj.body;
+    const x = Phaser.Math.Clamp(obj.x, b.left + hw, b.right - hw);
+    const y = Phaser.Math.Clamp(obj.y, b.top + hh, b.bottom - hh);
+    if (x === obj.x && y === obj.y) return;
+    const v = velocity.clone();
+    obj.body.reset(x, y);
+    obj.body.velocity.copy(v);
+  }
+
+  drawBoard() {
+    const c = COIN_DASH, b = this.board;
+    this.shade.clear().fillStyle(0x000000, 0.6)
+      .fillRect(0, 44, c.width, b.top - 44)
+      .fillRect(0, b.bottom, c.width, c.height - b.bottom)
+      .fillRect(0, b.top, b.left, b.height)
+      .fillRect(b.right, b.top, c.width - b.right, b.height)
+      .lineStyle(2, c.colors.drone, 0.7)
+      .strokeRectShape(b);
   }
 
   placeCoin() {
-    const c = COIN_DASH;
-    // Avoid spawning the next coin directly underneath the player.
-    let x, y;
+    const b = this.board;
+    // Avoid spawning the next coin directly underneath the player (give up after a few tries).
+    let x, y, tries = 0;
     do {
-      x = Phaser.Math.Between(25, c.width - 25);
-      y = Phaser.Math.Between(70, c.height - 25);
-    } while (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 60);
+      x = Phaser.Math.Between(b.left + 25, b.right - 25);
+      y = Phaser.Math.Between(b.top + 25, b.bottom - 25);
+    } while (Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y) < 60 && ++tries < 30);
     this.coin.setPosition(x, y);
     this.coin.body.reset(x, y);
   }
@@ -65,6 +103,7 @@ class CoinDash extends Phaser.Scene {
   finish(reason) {
     if (this.finished) return;
     this.finished = true;
+    this.shrinkTimer.remove();
     this.physics.pause();
     const c = COIN_DASH;
     this.add.rectangle(c.width / 2, c.height / 2, 460, 150, 0x0a1120, 0.95);
